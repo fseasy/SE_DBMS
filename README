@@ -1,1 +1,16 @@
 This is the HIT_CS SE lab about the DBMS 
+---------------------
+已经实现的：
+	DBMS，Table类的大体构建,文件操作、存取已实现
+	业务实现逻辑基本明确
+	实现Create，show，describe，insert,display
+需要实现的功能
+1.update
+	可以遍历表，将表的内容按块读入（因为每条记录大小绝对固定，所以read很简单），然后根据rowMode
+	的类型属性还原值，找到需要的块，然后seekg到需要更改的地方，重写如新的值。
+	可参考 rewrite.cpp 以及已写好的读取数据块、还原的部分源码
+2.delete
+	相当于update，只需要rewrite标志位即可
+3.select部分
+	包含 投影，等值连接
+现在可以分工做了，时间不多，尽早确定任务，实现功能。
