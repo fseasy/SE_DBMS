@@ -1,0 +1,32 @@
+# depslib dependency file v1.0
+1380608737 source:c:\users\xx.pureweber51-pc\dbms\dbms_lite\main.cpp
+	<iostream>
+	"DBMS.h"
+
+1380947721 c:\users\xx.pureweber51-pc\dbms\dbms_lite\dbms.h
+	<list>
+	<string>
+	<fstream>
+	<iostream>
+	<iterator>
+	<iomanip>
+	<windows.h>
+	"header.cpp"
+	"TABLE.h"
+
+1380947925 c:\users\xx.pureweber51-pc\dbms\dbms_lite\table.h
+	<list>
+	<string>
+	"DBMS.h"
+
+1380717498 c:\users\xx.pureweber51-pc\dbms\dbms_lite\header.cpp
+	<string>
+	<cstring>
+	<vector>
+	<algorithm>
+
+1380626076 source:c:\users\xx.pureweber51-pc\dbms\dbms_lite\header.cpp
+	<string>
+	<cstring>
+	<vector>
+

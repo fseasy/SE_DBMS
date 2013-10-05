@@ -1,0 +1,36 @@
+1.
+getline() string
+cin.getline char*
+
+2.
+transform(str.begin(),str.end(),str.begin(),::toupper) ;//include <algorithm> inlcude <iterator>
+
+3.
+ (1). 第一次调用 strtok 时, 第一个参数是 strToken, 以后再调用时, 第一个参数必须是 NULL; 
+
+     (2). 调用 strtok 后, 原字符串会被修改; 
+
+     (3). strtok 不是一个线程安全的函数. 
+4.
+fstream 必须指定为ios::in/ios::out ，不然不能读/写
+5:
+.....
+ long pos = file.tellg(); // 得到文件指针当前指向的文件位置。
+
+file.seekg(0,ios::beg); //让文件指针定位到文件开头
+file.seekg(0,ios::end); //让文件指针定位到文件末尾
+file.seekg(10,ios::cur); //让文件指针从当前位置向文件末方向移动10个字节
+file.seekg(-10,ios::cur); //让文件指针从当前位置向文件开始方向移动10个字节
+file.seekg(10,ios::beg); //让文件指针定位到离文件开头10个字节的位置
+5.函数有默认参数时：
+	第一次声明时写出来
+	第二次次不能写出默认值
+	如 int add(int a,int b = 3) ;
+	   int add(int a,int b)
+	   {
+		return a+b ;
+	   }
+6:
+c++ 常量字符串不能和整形等相加（连接）
+7.
+fstream  不能同时写入或读取

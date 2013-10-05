@@ -1,0 +1,28 @@
+#include <string>
+ 2#include <vector>
+ 3#include <algorithm>   
+ 4#include <functional>   
+ 5   
+ 6using namespace std;
+ 7
+ 8
+ 9inline string&  lTrim(string   &ss)   
+10{   
+11    string::iterator   p=find_if(ss.begin(),ss.end(),not1(ptr_fun(isspace)));   
+12    ss.erase(ss.begin(),p);   
+13    return  ss;   
+14}   
+15
+16inline  string&  rTrim(string   &ss)   
+17{   
+18    string::reverse_iterator  p=find_if(ss.rbegin(),ss.rend(),not1(ptr_fun(isspace)));   
+19    ss.erase(p.base(),ss.end());   
+20    return   ss;   
+21}   
+22
+23inline   string&   trim(string   &st)   
+24{   
+25    lTrim(rTrim(st));   
+26    return   st;   
+27}   
+28

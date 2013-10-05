@@ -1,0 +1,94 @@
+C/C++】枚举enum学习小记参考文献:
+[1]C++程序设计语言(特别版), 裘宗燕译, 机械工业出版社
+[2]C++ Primer (3rd Ed.), S.B. Lippman and J. Lajoie, 人民邮电出版社
+
+1、枚举enum的用途浅例
+      写程序时，我们常常需要为某个对象关联一组可选alternative属性.例如，学生的成绩分A,B,C,D等，天气分sunny, cloudy, rainy等等。
+      更常见的，打开一个文件可能有三种状态：input, output和append. 典型做法是，对应定义3个常数，即：
+      const int input = 1;
+      const int output = 2;
+      const int append = 3;
+然后，调用以下函数：
+      bool open_file(string file_name, int open_mode);
+比如，
+    open_file("Phenix_and_the_Crane", append);
+       这种做法比较简单，但存在许多缺点，主要的一点就是无法限制传递给open_file函数的第2个参数的取值范围，只要传递int类型的值都是合法的。(当然，这样的情况下的应对措施就是在open_file函数内部判断第二个参数的取值，只有在1，2，3范围内才处理。)
+       使用枚举能在一定程度上减轻这种尴尬(注1)，它不但能实现类似于之前定义三个常量的功能，还能够将这三个值组合起来成为独一无二的组。例如：
+      enum open_modes {input = 1, output, append};
+      以上定义了open_modes为枚举类型enumeration type。每一个命名了的枚举都是唯一的类型，是一个类型标示器type specifier。例如，我们可以重新写一个open_file函数:
+      bool open_file(string file_name, open_modes om);
+      在open_modes枚举中，input, output, append称为枚举子enumerator, 它们限定了open_modes定义的对象的取值范围。这个时候，调用open_file函数和之前的方法还是一模一样： 
+     open_file("Phenix_and_the_Crane", append);
+     但是，如果传递给open_file的第二个参数不是open_modes枚举类型值的话(注1)，那么编译器就会识别出错误；就算该参数取值等价于input, output, append中的某个，
+也一样会出错哦！例如：
+     open_file("Phenix_and_the_Crane", 1);
+2、枚举的定义
+      一个枚举是一个类型，可以保存一组由用户刻画的值。定义之类，枚举的使用很像一个整数类型。
+枚举的定义具有以下形式,即以关键词enum开头，接着一个可选的枚举名，下来是由大括号{}包含着一个由逗号分隔的枚举子列表enumerators list：
+      enum [enumeration name] {enumerator1[=value1], enumerator2[=value2], ...};
+3、枚举子的类型和取值
+      枚举子的类型就是它所在的那个枚举，例如前面说到的open_modes枚举中，input,output和append等枚举子的类型都是open_modes。这种做法，其实是为了赋予用户和编译器一些有关该变量拟议中的用途的提示。
+      默认下，第一个枚举子被赋值0，接下来的枚举子取值是前面一个枚举子的取值+1,例如：
+      enum weather {sunny, cloudy, rainy, windy};
+其中
+     sunny == 0, 
+      cloudy == 1,
+      rainy == 2,
+      windy == 3;
+       以上是默认情况，有时候我们希望显式地指定某个枚举子的值，那么会出现什么情况呢？看看：
+       enum some_fruit {apple = 3, orange, banana = 4, bear};
+       好了，apple == 3, banana == 4; 那么orange和bear呢？记得前面说过一句，默认下”接下来的枚举子取值是前面一个枚举子的取值+1“。既然这两个枚举子没有显式赋值，那么就按照默认规则办事，所以 orange == 4, bear == 5. 
+       从这个例子也可以看出，同一枚举中枚举子的取值不需要唯一。这样有什么用处呢？下面是个简单的例子：
+       enum some_big_cities {
+                                               Guangzhou = 4, 
+                                                Shenzhen    = 4, 
+                                               Hongkong   = 4, 
+                                               Shanghai    = 2, 
+                                               Beijing         = 3, 
+                                               Chongqi      = 3
+                                           };
+以上简单地按区域，将五个城市按照华南(4),华东(2), 华北(3)的几个城市分类了。
+4、枚举变量的定义、初始化和赋值
+     既然每个枚举都是一个类型，那么由这个类型自然可以声明变量，例如，由前面定义的some_big_cities：
+     some_big_cities where_I_am;
+     需要注意的是，在声明where_I_am时没有初始化，如果这时打印where_I_am的值： 
+     enum some_big_cities {
+                                            Guangzhou = 4, 
+                                            Shenzhen = 4, 
+                                            Hongkong = 4, 
+                                             Shanghai = 2, 
+                                            Beijing = 3, 
+                                             Chongqi = 5};
+int main(void)
+{ 
+      some_big_cities wh;
+     cout<<"the value is: "<<wh<<endl;
+     return 0;
+}
+输出将是the value is: 1. 然而，如果声明wh为全局变量，则另一种情况：
+enum some_big_cities {Guangzhou = 1 Shenzhen = 1, Hongkong = 1, 
+                                       Shanghai = 2, Beijing = 3, Chongqi = 5};
+some_big_cities wh;
+int main(void)
+{ 
+   cout<<"the value is: "<<wh<<endl;  
+   return 0;
+}
+输出将是the value is: 0;
+      以上结果是在Visual C++ 2005 Express中得到，不知道其它编译器情况如何，也不知为什么得到这样的结果。下来再找找资料。
+     定义一个枚举变量时，可以给它初始化，例如：
+     some_big_cities wh = Guangzhou;
+     注意等号右边只能取枚举子中的某一个；特别地，以Guangzhou为例，虽然Guangzhou==4, 但以下初始化是出错的：
+     some_big_cities wh = 4;
+     Visual C++ 2005编译器提示：
+        error C2440: 'initializing' : cannot convert from 'int' to 'some_big_cities'
+      可见，不能直接地把一个整型赋值给一个枚举变量，因为枚举和整型是不同类型的，除非显式转换。关于枚举与整型的关系，后面再讲。
+      除了初始化，枚举变量也有赋值运算：
+     some_big_cities wh；
+     wh = Guangzhou;
+     wh = Shanghai;
+或者
+    some_big_cities wh1 = Guangzhou；
+    some_big_cities wh2 = Shanghai；
+    wh2 = wh1;
+
