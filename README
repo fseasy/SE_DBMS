@@ -14,3 +14,7 @@ This is the HIT_CS SE lab about the DBMS
 3.select部分
 	包含 投影，等值连接
 现在可以分工做了，时间不多，尽早确定任务，实现功能。
+ps:
+DBMS文件夹下 
+	DBMS_lite 是项目文件夹，与它同级的文件是一些东西的文档资料
+functionTest文件夹下有一些测试功能实现的代码
