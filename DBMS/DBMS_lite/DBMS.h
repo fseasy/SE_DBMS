@@ -72,14 +72,24 @@ public:
     bool SQLInsert_Analysize(const string sql,string & attrName,string & attrVal,Table *& table) ;
     bool InsertTable(string attrName,string attrVal,Table * table) ;
     //-----------end Insert-------------------
+    //select
+    /**
+        select
+        1.firstly,we should realize the basic requirement,that is :
+            single table,include projection（投影）, where condition basic supported
+            in where condition ,just sipport 'and',and '>','=','<';
+
+    */
+    bool SQLSelect_Analysize(const string sql,vector<Table *> & tabs,vector<Condition *> & con,vector<string>& projection) ;
+    bool SelectTable(vector<Table *> & tabs,vector<Condition *> & con,vector<string> & projection) ;
     bool IsSupDataType(const string dataType) ;//is the supported data type
 private:
     string dbName ;
     fstream model ; //model file stream
     vector<Table *> tables ; //tables
     string oriSQL ; //!!由于SQL分析时需要忽略大小写，而insert等操作时又需要不能忽略大小写
-                    //!!于是就保存一份原始SQL，用upperSQL分析，用oriSQL插入
-                    //!!这并不好，但是开始时没考虑到，现在也只能这么做了
+    //!!于是就保存一份原始SQL，用upperSQL分析，用oriSQL插入
+    //!!这并不好，但是开始时没考虑到，现在也只能这么做了
 };
 
 DBMS::DBMS()
@@ -141,12 +151,15 @@ bool DBMS::Init()
             }
             else if(buffer[pos] == '\n')
             {
+                relMode[modepos] = '\0' ;//!!
                 readMode = false ;
                 readName = true ;
                 //relMode ok
                 //add Table
                 string tmpTName(tName) ;
+                cout << tmpTName ;
                 string tmpRelMode(relMode) ;
+                cout << tmpRelMode << endl;
                 AddTable(tmpTName,tmpRelMode,true) ;
                 //-----------end--------------
                 //next
@@ -264,11 +277,41 @@ void DBMS::Command()
             Table * table = NULL ;
             if(SQLInsert_Analysize(sql,attrName,attrVal,table))
             {
-                 InsertTable(attrName,attrVal,table) ;
+                InsertTable(attrName,attrVal,table) ;
             }
             else
             {
                 Error("Insert failed !") ;
+            }
+        }
+        else if("SELECT" == command)
+        {
+            vector<string> projection ;
+            vector<Condition *> con ;
+            vector<Table *> tabs ;
+            if(SQLSelect_Analysize(sql,tabs,con,projection))
+            {
+                SelectTable(tabs,con,projection) ;
+            }
+            else
+            {
+                Error("Select faild") ;
+            }
+            /*
+            for(int i =0 ; i < projection.size() ; i++)
+            {
+                cout << projection.at(i) <<"\t" ;
+            }
+            cout << endl ;
+            for(int i = 0 ; i < con.size() ; i++)
+            {
+                cout <<con.at(i)->mulope <<"\t" <<con.at(i)->attrName <<"\t"\
+                     <<con.at(i)->cmpope <<"\t" <<con.at(i)->val <<endl ;
+            }
+            */
+            for(int i = 0 ; i < con.size() ; i++)
+            {
+                delete con.at(i) ;
             }
         }
         else
@@ -579,6 +622,194 @@ bool DBMS::SQLDisplay_Analysize(const string sql,Table * & table)
         Error("No table named '"+tableName+"'") ;
         return false ;
     }
+}
+bool DBMS::SQLSelect_Analysize(const string sql,vector<Table *>& tabs,vector<Condition *>& con,vector<string>& projection)
+{
+    //con may be empty,projection may be empty
+    if(sql.find("FROM") == string::npos)
+    {
+        Error("'From' key word not found") ;
+        return false ;
+    }
+    vector <string> words ;
+    char * x = GetAllWords(sql,words) ;
+    bool getPro = true ;
+    bool getTable = false ;
+    bool getCon = false ;
+    for(int i = 1 ; i < words.size() ; i++)
+    {
+        string tmp = words.at(i) ;
+        Trim(tmp) ;
+        if(tmp == "FROM")
+        {
+            getPro = false ;
+            getTable = true ;
+        }
+        else if(tmp == "WHERE")
+        {
+            getTable = false ;
+            getCon = true ;
+        }
+        else
+        {
+            if(getPro)
+            {
+                if(tmp != "*" )
+                {
+                    projection.push_back(tmp) ;
+                }
+            }
+            else if(getTable)
+            {
+                bool isExist = false ;
+                for(int j = 0 ; j < tables.size() ; j++)
+                {
+                    if(tables.at(j)->GetTableName() == tmp)
+                    {
+                        tabs.push_back(tables.at(j)) ;
+                        isExist = true ;
+                        break ;
+                    }
+                }
+                //not found
+                if(!isExist)
+                {
+                    Error("No such table named '"+tmp+"' ") ;
+                    delete [] x ;
+                    return false ;
+                }
+
+            }
+            else if(getCon)
+            {
+                int hpos = sql.find("WHERE") + strlen("WHERE") ;
+                //start get condition
+                string buf = "" ;
+                int len = sql.length() -1 ;//the last char is ';'
+                bool theFirst = true ; //第一组的mulope默认为and
+                for(int i = hpos ; i < len ; i++)
+                {
+                    if(oriSQL[i] == ' ')
+                        continue ;
+                    //每次读取一组
+                    Condition * condition = new Condition ;
+                    if(theFirst)
+                    {
+                        condition->mulope = "AND" ;
+                        theFirst = false ;
+                    }
+                    else
+                    {
+                        for(; i < len ; i++)
+                        {
+                            if(oriSQL[i] != ' ')
+                            {
+                                buf+=sql[i] ;
+                            }
+                            else
+                            {
+                                condition->mulope = buf ;
+                                buf = "" ;
+                                break ;
+                            }
+                        }
+                    }
+                    //attrName
+                    for( ; i < len && oriSQL[i] == ' '; i++) ;//ignore space
+
+                    for(; i < len ; i++)
+                    {
+                        char tmp = oriSQL[i] ;
+                        if(tmp != ' ' && tmp != '=' && tmp != '>' && tmp != '<')
+                        {
+                            buf+=sql[i] ;
+                        }
+                        else
+                        {
+                            condition->attrName = buf ;
+                            buf = "" ;
+                            break ;
+                        }
+                    }
+                    //cmpope
+                    for( ; i < len  && oriSQL[i] == ' ' ; i++ ) ; //ignore space
+
+                    for( ; i < len ; i++)
+                    {
+                        if(oriSQL[i] == '='|| oriSQL[i] == '>' || oriSQL[i] == '<')
+                        {
+                            buf+=oriSQL[i] ;
+                        }
+                        else
+                        {
+                            condition->cmpope = buf ;
+                            buf = "" ;
+                            break ;
+                        }
+                    }
+                    //val
+                    for( ; i < len && oriSQL[i] == ' ' ; i++) ;
+                    char tmp ;
+                    tmp = oriSQL[i] ;
+                    if(tmp == '"')
+                    {
+                        //it's str
+                        hpos = i+1 ;
+                        for(i++ ; i < len && oriSQL[i] != '"' ; i++) ;
+
+                        int rpos = i ;
+                        condition->val = oriSQL.substr(hpos,rpos-hpos) ;
+                    }
+                    else if(tmp == '\'')
+                    {
+                        hpos = i+1 ;
+                        for( i++ ; i < len && oriSQL[i] != '\'' ; i++) ;
+
+                        int rpos = i ;
+                        condition->val = oriSQL.substr(hpos,rpos-hpos) ;
+                    }
+                    else
+                    {
+                        //it is not str
+                        for( ; i < len ; i++)
+                        {
+                            if(oriSQL[i] != ' ')
+                            {
+                                buf+=oriSQL[i] ;
+                            }
+                            else
+                            {
+                                condition->val = buf ;
+                                buf ="" ;
+                                break ;
+                            }
+                        }
+                        //可能是由于i = len而跳出循环，这时val值未保存
+                        if(i == len)
+                        {
+                            condition->val = buf ;
+                            buf ="" ;
+                        }
+
+                    }
+                    con.push_back(condition) ;
+                }
+                break ;
+            }
+        }
+
+    }
+    delete [] x ;
+    return true ;
+}
+bool DBMS::SelectTable(vector<Table*>& tabs,vector<Condition *>& con,vector<string>& projection)
+{
+    if(tabs.size() == 1)
+    {
+        return tabs.at(0)->Select(con,projection) ;
+    }
+    else
+    return false ;
 }
 void DBMS::DisplayTable(Table* table)
 {

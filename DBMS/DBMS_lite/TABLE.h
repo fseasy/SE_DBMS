@@ -21,15 +21,19 @@ public:
     bool setLink(vector<string> & names) ;
     //--describe
     void Describe() ;
-    //--select
+    //--display
     bool Display() ;
+    //--select
+    bool Select(vector<Condition *> & con,vector<string> & projection) ;
     string GetTableName() ;
     int getFieldNum() ;
 
 private:
     ifstream  data_in ;
     ofstream  data_out ;
+    fstream tmpFile ;
     string tName ;
+    string tableFileName ;
     vector<RowMode*> rowMode ;
     //fileinfo
     int fieldNum ; //字段数
@@ -39,9 +43,7 @@ private:
 Table::Table(string tName, string relMode)
 {
     this->tName = tName ;
-    string fileName = tName+".txt" ;
-    data_in.open(fileName.c_str(),ios::binary|ios::in) ;
-    data_out.open(fileName.c_str(),ios::binary|ios::out|ios::app) ;
+    tableFileName = tName+".txt" ;
     fieldNum = 0 ;
     rowSize = 0 ;
     rowSize+=sizeof(char) ;//标识位
@@ -93,8 +95,6 @@ Table::~Table()
         delete rowMode.at(i) ;
     }
     delete link ;
-    data_in.close() ;
-    data_out.close() ;
 }
 void Table::Describe()
 {
@@ -116,7 +116,7 @@ void Table::Describe()
 }
 bool Table::Insert(vector<string> & names,vector<string> & values)
 {
-
+    data_out.open(tableFileName.c_str(),ios::binary|ios::out|ios::app) ;
     char * rowbuf = new char[rowSize] ;
     //!!first ,write flag
     char flag = '1' ;
@@ -179,7 +179,7 @@ bool Table::Insert(vector<string> & names,vector<string> & values)
     if(data_out)
     {
         data_out.write(rowbuf,rowSize) ;
-        data_out.flush() ;
+        data_out.close() ;
         return true ;
     }
     else
@@ -286,6 +286,7 @@ bool Table::setLink(vector<string> & names)
 }
 bool Table::Display()
 {
+    data_in.open(tableFileName.c_str(),ios::binary|ios::in) ;
     if(data_in)
     {
         data_in.seekg(0,data_in.beg) ;//to the begin
@@ -331,6 +332,8 @@ bool Table::Display()
 
             }
         }
+        delete [] buffer ;
+        data_in.close() ;
         return true ;
     }
     else
@@ -338,6 +341,153 @@ bool Table::Display()
         Error("Table '"+tName+"' open failed") ;
         return false ;
     }
+}
+bool Table::Select(vector<Condition *> & con,vector<string>& projection)
+{
+    bool isMCs[con.size()] ;//is meet conditions
+    for(int i = 0 ; i < con.size() ; i++)
+    {
+        isMCs[i] = true ;
+    }
+    //is con empty
+    //完善 con
+    for(int i = 0 ; i < con.size() ; i++)
+    {
+        int offset = 1 ;
+        int rowIndex = 0 ;
+        bool isFound = false ;
+        for( ; rowIndex <rowMode.size() ; rowIndex++)
+        {
+            if(rowMode.at(rowIndex)->fieldName == con.at(i)->attrName)
+            {
+                con.at(i)->rowIndex = rowIndex  ;
+                con.at(i)->offset = offset ;
+                isFound = true ;
+                break ;
+            }
+            else
+            {
+                offset+=rowMode.at(rowIndex)->fieldSize ;
+            }
+        }
+        if(!isFound)
+        {
+            Error("no such column named '"+con.at(i)->attrName+"'") ;
+            return false ;
+        }
+        //start to read
+        data_in.open(tableFileName.c_str(),ios::binary|ios::in) ;
+        tmpFile.open("tmp.txt",ios::out|ios::binary) ;
+        if(!tmpFile||!data_in)
+        {
+            Error("Temp file created failed ") ;
+            return false ;
+        }
+        int rowNum = 10 ;
+        char buffer[rowNum*rowSize] ;
+        while(!data_in.eof())
+        {
+            int basepos = 0 ;
+            data_in.read(buffer,sizeof(buffer)) ;
+            int extractNum = data_in.gcount() ;
+            for(int i = 0 ; basepos < extractNum ; i++)
+            {
+                int pos = 0 ;
+                char flag ;
+                memcpy(&flag,buffer+basepos+pos,sizeof(char)) ;
+                if(flag == '1')
+                {
+                    //ok,judge
+                    bool isMC = true ;
+                    for(int i = 0 ; i < con.size() ; i++)
+                    {
+                        //first,get the type of data
+                        string type = rowMode.at(con.at(i)->rowIndex)->fieldType ;
+                        if(type == "VARCHAR" || type == "CHAR")
+                        {
+                            if(con.at(i)->cmpope == "=") //cmpope
+                            {
+                                int offset = con.at(i)->offset ;
+                                if(strcmp(buffer+basepos+offset,(con.at(i)->val).c_str()) != 0)
+                                {
+                                        isMCs[i] = false ;
+                                }
+                            }
+                            else
+                            {
+                                Error("NOT suported for operator '"+con.at(i)->cmpope+"'") ;
+                                return false ;
+                            }
+                        }
+                        else if(type == "INT")
+                        {
+                            int x ;
+                            int offset = con.at(i)->offset ;
+                            memcpy(&x,buffer+basepos+offset,sizeof(int)) ;
+                            //cout <<"data is " << x <<"\n" ;
+                            int conval ;
+                            conval =  atoi((con.at(i)->val).c_str()) ;
+                           // cout <<"conval is " <<conval <<"\n" ;
+                            if(con.at(i)->cmpope == "=")
+                            {
+                                if(x != conval)
+                                {
+                                    isMCs[i] = false ;
+                                }
+                            }
+                            else if(con.at(i)->cmpope == ">")
+                            {
+                                if(! (x> conval))
+                                {
+                                    isMCs[i] = false ;
+                                }
+                            }
+                            else if(con.at(i)->cmpope == "<")
+                            {
+                                if(! (x< conval))
+                                {
+                                    isMCs[i] = false ;
+                                }
+                            }
+                            else if(con.at(i)->cmpope == "<=")
+                            {
+                                if(! (x<= conval))
+                                {
+                                    isMCs[i] = false ;
+                                }
+                            }
+                            else if(con.at(i)->cmpope == ">=")
+                            {
+                                if(! (x>= conval))
+                                {
+                                    isMCs[i] = false ;
+                                }
+                            }
+                            else
+                            {
+                                Error("Not suported such operatio '"+con.at(i)->cmpope+"'") ;
+                                return false ;
+                            }
+                        }
+                        if(con.at(i)->mulope == "AND")//mulope
+                        {
+                            isMC = isMCs[i]&isMC ;
+                            isMCs[i] = true ;//!!还原！！！！
+                        }
+                    }
+                    if(isMC)
+                    {
+                        cout <<"ok" ;
+                        tmpFile.write(buffer+basepos,rowSize) ;
+                    }
+
+                }
+                basepos+=rowSize ;
+            }
+        }
+    }
+    data_in.close() ;
+    tmpFile.close() ;
 }
 string Table::GetTableName()
 {

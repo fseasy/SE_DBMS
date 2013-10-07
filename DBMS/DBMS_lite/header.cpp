@@ -10,16 +10,24 @@ struct RowMode
     string fieldType ;
     int    fieldSize ;
 } ;
-
+struct Condition
+{
+    string attrName ;
+    string val ;
+    string mulope ; //'and' or 'or' ,etc
+    string cmpope ; //'>' or '<' '=' ,etc
+    int offset ; // data offset
+    int rowIndex ; //index of rowMode
+} ;
 /**
-        去掉首尾空格
+        去掉首尾空格/其他字符
 */
-string Trim(string & str)
+string Trim(string & str,char trim = ' ')
 {
     string::iterator pos ;
     for(pos = str.begin() ; pos != str.end() ; pos++)
     {
-        if(*pos != ' ')
+        if(*pos != trim)
         {
             break ;
         }
@@ -27,7 +35,7 @@ string Trim(string & str)
     str.erase(str.begin(),pos) ;//erase(iterator begin,iterator end) or erase(int begin,int end)
     for(pos = str.end() ; pos != str.begin() ; pos--)
     {
-        if(*pos != ' ')
+        if(*pos != trim)
         {
             break ;
         }
@@ -83,9 +91,9 @@ char * Split(const string str,char * split,vector<string> & res)
     get all words
 
 */
-bool IsLegal(char c)
+inline bool IsLegal(char c)
 {
-    if((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9'))
+    if((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c=='_')
     return true ;
     else
     return false ;
