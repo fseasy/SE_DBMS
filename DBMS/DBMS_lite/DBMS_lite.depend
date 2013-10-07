@@ -30,3 +30,29 @@
 	<cstring>
 	<vector>
 
+1380608737 source:c:\users\xx.pureweber51-pc\se_dbms\dbms\dbms_lite\main.cpp
+	<iostream>
+	"DBMS.h"
+
+1381153515 c:\users\xx.pureweber51-pc\se_dbms\dbms\dbms_lite\dbms.h
+	<list>
+	<string>
+	<fstream>
+	<iostream>
+	<iterator>
+	<iomanip>
+	<windows.h>
+	"header.cpp"
+	"TABLE.h"
+
+1381130102 c:\users\xx.pureweber51-pc\se_dbms\dbms\dbms_lite\header.cpp
+	<string>
+	<cstring>
+	<vector>
+	<algorithm>
+
+1381153080 c:\users\xx.pureweber51-pc\se_dbms\dbms\dbms_lite\table.h
+	<list>
+	<string>
+	"DBMS.h"
+

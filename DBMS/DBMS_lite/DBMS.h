@@ -157,9 +157,9 @@ bool DBMS::Init()
                 //relMode ok
                 //add Table
                 string tmpTName(tName) ;
-                cout << tmpTName ;
+                //cout << tmpTName ;
                 string tmpRelMode(relMode) ;
-                cout << tmpRelMode << endl;
+                //cout << tmpRelMode << endl;
                 AddTable(tmpTName,tmpRelMode,true) ;
                 //-----------end--------------
                 //next
@@ -291,6 +291,7 @@ void DBMS::Command()
             vector<Table *> tabs ;
             if(SQLSelect_Analysize(sql,tabs,con,projection))
             {
+                //cout << con.size() <<"\t" <<tabs.size() <<"\t" << projection.size() <<endl;
                 SelectTable(tabs,con,projection) ;
             }
             else

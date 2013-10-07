@@ -25,6 +25,7 @@ public:
     bool Display() ;
     //--select
     bool Select(vector<Condition *> & con,vector<string> & projection) ;
+    void Projection(int pjOffset[] ,int pjIndex[] ,int colNum) ;
     string GetTableName() ;
     int getFieldNum() ;
 
@@ -344,150 +345,267 @@ bool Table::Display()
 }
 bool Table::Select(vector<Condition *> & con,vector<string>& projection)
 {
+    int * pjOffset = NULL ;
+    int * pjIndex = NULL ;
+    int pjsize ;
+    if(projection.size() != 0 )
+    {
+        pjOffset = new int[projection.size()] ;
+        pjIndex = new int[projection.size()] ;
+        pjsize = projection.size() ;
+        for(int i = 0 ; i < projection.size() ; i++)
+        {
+            int offset = 1 ;
+            bool isFound = false ;
+            for(int j = 0 ; j < rowMode.size() ; j++)
+            {
+                if(rowMode.at(j)->fieldName == projection.at(i))
+                {
+                    pjOffset[i] = offset ;
+                    pjIndex[i] = j ;
+                    isFound = true ;
+                    break ;
+                }
+                else
+                {
+                    offset += rowMode.at(j)->fieldSize ;
+                }
+            }
+            if(!isFound)
+            {
+                Error("No such column named '"+projection.at(i)+"'") ;
+                return false ;
+            }
+        }
+    }
+    else
+    {
+        //cout <<"pj empty\n" ;
+        int offset = 1 ;
+        pjOffset = new int[fieldNum] ;
+        pjIndex = new int[fieldNum] ;
+        pjsize = fieldNum ;
+        for(int i = 0 ; i < rowMode.size() ; i++)
+        {
+            pjIndex[i] = i ;
+            pjOffset[i] = offset ;
+            offset+=rowMode.at(i)->fieldSize ;
+        }
+    }
     bool isMCs[con.size()] ;//is meet conditions
     for(int i = 0 ; i < con.size() ; i++)
     {
         isMCs[i] = true ;
     }
     //is con empty
-    //完善 con
-    for(int i = 0 ; i < con.size() ; i++)
+    data_in.open(tableFileName.c_str(),ios::binary|ios::in) ;
+    tmpFile.open("tmp.txt",ios::out|ios::binary) ;
+    if(!tmpFile||!data_in)
     {
-        int offset = 1 ;
-        int rowIndex = 0 ;
-        bool isFound = false ;
-        for( ; rowIndex <rowMode.size() ; rowIndex++)
+        Error("Temp file created failed ") ;
+        return false ;
+    }
+    if(!con.empty())
+    {
+
+        //完善 con
+        for(int i = 0 ; i < con.size() ; i++)
         {
-            if(rowMode.at(rowIndex)->fieldName == con.at(i)->attrName)
+            int offset = 1 ;
+            int rowIndex = 0 ;
+            bool isFound = false ;
+            for( ; rowIndex <rowMode.size() ; rowIndex++)
             {
-                con.at(i)->rowIndex = rowIndex  ;
-                con.at(i)->offset = offset ;
-                isFound = true ;
-                break ;
+                if(rowMode.at(rowIndex)->fieldName == con.at(i)->attrName)
+                {
+                    con.at(i)->rowIndex = rowIndex  ;
+                    con.at(i)->offset = offset ;
+                    isFound = true ;
+                    break ;
+                }
+                else
+                {
+                    offset+=rowMode.at(rowIndex)->fieldSize ;
+                }
             }
-            else
+            if(!isFound)
             {
-                offset+=rowMode.at(rowIndex)->fieldSize ;
+                Error("no such column named '"+con.at(i)->attrName+"'") ;
+                return false ;
+            }
+            //start to read
+            int rowNum = 10 ;
+            char buffer[rowNum*rowSize] ;
+            while(!data_in.eof())
+            {
+                int basepos = 0 ;
+                data_in.read(buffer,sizeof(buffer)) ;
+                int extractNum = data_in.gcount() ;
+                for( ; basepos < extractNum ; basepos+=rowSize)
+                {
+                    int pos = 0 ;
+                    char flag ;
+                    memcpy(&flag,buffer+basepos+pos,sizeof(char)) ;
+                    if(flag == '1')
+                    {
+                        //ok,judge
+                        bool isMC = true ;
+                        for(int i = 0 ; i < con.size() ; i++)
+                        {
+                            //first,get the type of data
+                            string type = rowMode.at(con.at(i)->rowIndex)->fieldType ;
+                            if(type == "VARCHAR" || type == "CHAR")
+                            {
+                                if(con.at(i)->cmpope == "=") //cmpope
+                                {
+                                    int offset = con.at(i)->offset ;
+                                    if(strcmp(buffer+basepos+offset,(con.at(i)->val).c_str()) != 0)
+                                    {
+                                        isMCs[i] = false ;
+                                    }
+                                }
+                                else
+                                {
+                                    Error("NOT suported for operator '"+con.at(i)->cmpope+"'") ;
+                                    return false ;
+                                }
+                            }
+                            else if(type == "INT")
+                            {
+                                int x ;
+                                int offset = con.at(i)->offset ;
+                                memcpy(&x,buffer+basepos+offset,sizeof(int)) ;
+                                //cout <<"data is " << x <<"\n" ;
+                                int conval ;
+                                conval =  atoi((con.at(i)->val).c_str()) ;
+                                // cout <<"conval is " <<conval <<"\n" ;
+                                if(con.at(i)->cmpope == "=")
+                                {
+                                    if(x != conval)
+                                    {
+                                        isMCs[i] = false ;
+                                    }
+                                }
+                                else if(con.at(i)->cmpope == ">")
+                                {
+                                    if(! (x> conval))
+                                    {
+                                        isMCs[i] = false ;
+                                    }
+                                }
+                                else if(con.at(i)->cmpope == "<")
+                                {
+                                    if(! (x< conval))
+                                    {
+                                        isMCs[i] = false ;
+                                    }
+                                }
+                                else if(con.at(i)->cmpope == "<=")
+                                {
+                                    if(! (x<= conval))
+                                    {
+                                        isMCs[i] = false ;
+                                    }
+                                }
+                                else if(con.at(i)->cmpope == ">=")
+                                {
+                                    if(! (x>= conval))
+                                    {
+                                        isMCs[i] = false ;
+                                    }
+                                }
+                                else
+                                {
+                                    Error("Not suported such operatio '"+con.at(i)->cmpope+"'") ;
+                                    return false ;
+                                }
+                            }
+                            if(con.at(i)->mulope == "AND")//mulope
+                            {
+                                isMC = isMCs[i]&isMC ;
+                                isMCs[i] = true ;//!!还原！！！！
+                            }
+                        }
+                        if(isMC)
+                        {
+                            tmpFile.write(buffer+basepos,rowSize) ;
+                        }
+
+                    }
+
+                }
             }
         }
-        if(!isFound)
-        {
-            Error("no such column named '"+con.at(i)->attrName+"'") ;
-            return false ;
-        }
-        //start to read
-        data_in.open(tableFileName.c_str(),ios::binary|ios::in) ;
-        tmpFile.open("tmp.txt",ios::out|ios::binary) ;
-        if(!tmpFile||!data_in)
-        {
-            Error("Temp file created failed ") ;
-            return false ;
-        }
+    }
+    else
+    {
         int rowNum = 10 ;
         char buffer[rowNum*rowSize] ;
         while(!data_in.eof())
         {
-            int basepos = 0 ;
             data_in.read(buffer,sizeof(buffer)) ;
             int extractNum = data_in.gcount() ;
-            for(int i = 0 ; basepos < extractNum ; i++)
+            for(int basepos = 0 ; basepos < extractNum ; basepos+=rowSize)
             {
-                int pos = 0 ;
                 char flag ;
-                memcpy(&flag,buffer+basepos+pos,sizeof(char)) ;
+                memcpy(&flag,buffer+basepos,sizeof(char)) ;
                 if(flag == '1')
                 {
-                    //ok,judge
-                    bool isMC = true ;
-                    for(int i = 0 ; i < con.size() ; i++)
-                    {
-                        //first,get the type of data
-                        string type = rowMode.at(con.at(i)->rowIndex)->fieldType ;
-                        if(type == "VARCHAR" || type == "CHAR")
-                        {
-                            if(con.at(i)->cmpope == "=") //cmpope
-                            {
-                                int offset = con.at(i)->offset ;
-                                if(strcmp(buffer+basepos+offset,(con.at(i)->val).c_str()) != 0)
-                                {
-                                        isMCs[i] = false ;
-                                }
-                            }
-                            else
-                            {
-                                Error("NOT suported for operator '"+con.at(i)->cmpope+"'") ;
-                                return false ;
-                            }
-                        }
-                        else if(type == "INT")
-                        {
-                            int x ;
-                            int offset = con.at(i)->offset ;
-                            memcpy(&x,buffer+basepos+offset,sizeof(int)) ;
-                            //cout <<"data is " << x <<"\n" ;
-                            int conval ;
-                            conval =  atoi((con.at(i)->val).c_str()) ;
-                           // cout <<"conval is " <<conval <<"\n" ;
-                            if(con.at(i)->cmpope == "=")
-                            {
-                                if(x != conval)
-                                {
-                                    isMCs[i] = false ;
-                                }
-                            }
-                            else if(con.at(i)->cmpope == ">")
-                            {
-                                if(! (x> conval))
-                                {
-                                    isMCs[i] = false ;
-                                }
-                            }
-                            else if(con.at(i)->cmpope == "<")
-                            {
-                                if(! (x< conval))
-                                {
-                                    isMCs[i] = false ;
-                                }
-                            }
-                            else if(con.at(i)->cmpope == "<=")
-                            {
-                                if(! (x<= conval))
-                                {
-                                    isMCs[i] = false ;
-                                }
-                            }
-                            else if(con.at(i)->cmpope == ">=")
-                            {
-                                if(! (x>= conval))
-                                {
-                                    isMCs[i] = false ;
-                                }
-                            }
-                            else
-                            {
-                                Error("Not suported such operatio '"+con.at(i)->cmpope+"'") ;
-                                return false ;
-                            }
-                        }
-                        if(con.at(i)->mulope == "AND")//mulope
-                        {
-                            isMC = isMCs[i]&isMC ;
-                            isMCs[i] = true ;//!!还原！！！！
-                        }
-                    }
-                    if(isMC)
-                    {
-                        cout <<"ok" ;
-                        tmpFile.write(buffer+basepos,rowSize) ;
-                    }
-
+                    tmpFile.write(buffer+basepos,rowSize) ;
                 }
-                basepos+=rowSize ;
             }
         }
     }
     data_in.close() ;
     tmpFile.close() ;
+    //projection
+    Projection(pjOffset,pjIndex,pjsize) ;
+}
+void Table::Projection(int  pjOffset[],int  pjIndex[],int colNum)
+{
+    tmpFile.open("tmp.txt",ios::in|ios::binary) ;
+    if(!tmpFile)
+    {
+        Error("Temp file open failed") ;
+        return ;
+    }
+    //out put the title
+    for(int i = 0 ; i < colNum ; i++)
+    {
+        int width = rowMode.at(pjIndex[i])->fieldSize ;
+        cout <<left << setw(width+4) <<rowMode.at(pjIndex[i])->fieldName ;
+    }
+    cout << endl ;
+    int rowNum = 10 ;
+    char buffer[rowNum*rowSize] ;
+    while(!tmpFile.eof())
+    {
+        int basepos = 0 ;
+        tmpFile.read(buffer,sizeof(buffer)) ;
+        int extractNum = tmpFile.gcount() ;
+        for(; basepos < extractNum ; basepos+=rowSize)
+        {
+            for(int i = 0 ; i < colNum ; i++)
+            {
+                string type = rowMode.at(pjIndex[i])->fieldType ;
+                int width = rowMode.at(pjIndex[i])->fieldSize ;
+                if( type == "CHAR" || type == "VARCHAR")
+                {
+                    // it can output directly
+                    cout <<setw(width+4)<< left <<buffer+basepos+pjOffset[i] ;
+                }
+                else if(type == "INT")
+                {
+                    int x ;
+                    memcpy(&x,buffer+basepos+pjOffset[i],sizeof(int)) ;
+                    cout <<setw(width+4) <<left << x ;
+                }
+            }
+            cout << endl ;
+        }
+    }
+    tmpFile.close() ;
+
 }
 string Table::GetTableName()
 {
